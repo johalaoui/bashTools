@@ -1,0 +1,200 @@
+#!/bin/bash
+## Example for thisDir
+#thisDir="$(cd "$(dirname "$0")"; pwd)"
+#. "$thisDir/tools" # import tools
+
+if [ ! -e "$thisDir" ]; then
+  echo "Please set variable \$thisDir correctly!";
+  exit 1
+fi
+
+getVarValFile(){
+  local file=$1
+  local var=$2
+
+  grep -Po "(?<=^$var=).*" $file
+}
+
+export distID="$(getVarValFile /etc/os-release ID)"
+
+packageDependency(){
+  local pkgs="$@"
+  local missingPkgs=""
+  case "$distID" in
+    arch)
+      cmd="pacman -Q"
+    ;;
+    debian|ubuntu|raspbian)
+      cmd="dpkg -l"
+    ;;
+  esac
+
+  for p in $pkgs; do
+    $cmd $p >& /dev/null || {
+      missingPkgs+="$p "
+    }
+  done
+
+  [ -z "$missingPkgs" ] || {
+    echo "Missing Packages: $missingPkgs
+exit."
+    exit 1
+  }
+}
+
+packageDependency bc
+
+export TOOLS_SRC=true # Testing complete, tools sourced
+
+thisTimeFormat="+%Y%m%d-%H%M%S"
+thisSrcTime="$(date "$thisTimeFormat")" # time when this script was sourced
+thisName="$(basename $0)"
+
+cyan='\e[0;36m'
+boldBright='\e[1m'
+resetFormat='\e[0m'
+
+
+printInfo(){
+  echo -e "$cyan$1$resetFormat"
+}
+
+# usage: test if variable $v1 and $v2 are set:
+# varIsSetOrError "v1" "v2"
+varIsSetOrError(){ # $1: varName ... $n: varName
+  local errMsg=""
+  while [ "$#" -gt 0 ]; do
+    local varName="$1"
+    local varValue="${!1}"
+    [ -z "$varValue" ] &&
+      errMsg+="ERROR: \$$varName was not set.\n"
+    shift
+  done
+  [ -n "$errMsg" ] && {
+    printInfo "$errMsg"
+    caller
+    exit 1
+  }
+}
+
+getFlag(){ # $1: input, $2: default=(false|true)
+  local flg="${1:-$2}"
+  flg="$(sed -E 's/Y|y|1/true/g;s/N|n|0/false/g' <<< "$flg")"
+  echo "$flg"
+}
+
+question(){ # $1: msg, $2: ansPreDef=false
+  local ansPreDef=${2:-false}
+  local anstxt="[y/N]"
+  if $ansPreDef; then
+    anstxt="[Y/n]"
+  fi
+  local ans=""
+  while ! grep -Ei '^[yn]$' <<< "$ans" &> /dev/null; do
+    printInfo "$1 $anstxt"
+    read ans
+    
+    $(getFlag "$ans" "$ansPreDef") && {
+      return 0
+    } || {
+      return 1
+    }
+  done
+}
+
+showMenuRetNum(){ # $1: msg, $2: opt1, $3: opt2, ...; returns menu number in $input
+  local msgopt="$1\n" # msg
+  shift # shifts to next param
+  if [ -z "$1" ]; then
+    echo "ERROR: No options."
+    exit 1
+  fi
+  local cnt=1
+  while [ -n "${!cnt}" ]; do
+    msgopt+=" [$cnt] ${!cnt}\n" # opts
+    ((cnt++))
+  done
+  input=0
+  while ! [ $input -ge 1 -a $input -lt $cnt ]; do
+    printf "$msgopt"
+    read input
+  done
+#  echo "${FUNCNAME[1]}: $input" # don't use echo to return results, otherwise you will not be able to show menu
+}
+
+showMenu(){ # $1: msg, $2: opt1, $3: opt2, ...; returns menu option in $input
+  showMenuRetNum "$@"
+  shift # shift away msg
+  input="${!input}" # translates selection number to menu option
+#  echo "${FUNCNAME[1]}: $input" # don't use echo to return results, otherwise you will not be able to show menu
+}
+
+toInt(){
+  sed 's/\..*//g'
+}
+
+twoDigits(){
+  local str
+  read str
+  if [ "$(echo "$str" | wc -m)" -eq 2 ]; then
+    echo "0$str"
+    return
+  fi
+  echo "$str"
+}
+
+calcRunTime(){ # $1: start, $2: end
+  local   d="$(echo "(${2} - ${1}) / (24 * 60 * 60)" | bc | toInt )"
+  local   h="$(echo "(${2} - ${1}) / (60 * 60) % 24" | bc | toInt | twoDigits)"
+  local min="$(echo "(${2} - ${1}) / 60 % 60"        | bc | toInt | twoDigits)"
+  local   s="$(echo "(${2} - ${1}) % 60"             | bc | toInt | twoDigits)"
+  local  ms="$(echo "(${2} - ${1}) % 1 * 1000"       | bc | toInt )"
+  echo "${d}d $h:$min:$s.$ms"
+}
+
+printRunTime(){ # $1: start, $2: end  ## needed for log()
+  echo "Runtime: $(calcRunTime $1 $2)"
+}
+
+getLogPath(){ # [$1: additionalName, $2: logD (directory containing log/)]
+  local logD="${2:-${thisDir}/log}"
+  local logPath="$logD/${thisSrcTime}_${thisName}"
+  if [ -n "$1" ]; then
+    logPath+="__$1"
+  fi
+  logPath+=".log"
+  echo "$logPath"
+}
+
+log(){ # [$1: additionalName, $2: logD (directory containing log/), $3: printInfo=true]
+  local logPath="$(getLogPath "$1" "$2")"
+  mkdir -p "$(dirname $logPath)"
+  local prntInfo="$(getFlag $3 true)"
+  local start="$(date '+%s.%N')"
+  tee -a "$logPath"
+  local end="$(date '+%s.%N')"
+  if $prntInfo; then
+    printRunTime $start $end | tee -a "$logPath"
+    echo "Logfile: $logPath"
+  fi
+}
+
+chAddConf(){
+  local confFile="$1"
+  local conf="$2"
+  local val="$3"
+  local sep="${4:- }"
+  
+  sudo grep -E "^[ ]*$conf$sep" "$confFile" > /dev/null && {
+    # config exists
+    sudo sed -i "s/^[ ]*$conf$sep.*/$conf$sep$val/g" "$confFile"
+  } || {
+    sudo grep -E "^[# ]*$conf$sep" "$confFile" > /dev/null && {
+      # config commented
+      sudo sed -i "s/^[# ]*$conf$sep.*/$conf$sep$val/g" "$confFile"
+    } || {
+      # no config
+      sudo tee -a "$confFile" <<< "$conf$sep$val" > /dev/null
+    }
+  }
+}
