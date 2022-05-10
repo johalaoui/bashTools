@@ -66,11 +66,11 @@ varIsSetOrError(){ # $1: varName ... $n: varName
   while [ "$#" -gt 0 ]; do
     local varName="$1"
     local varValue="${!1}"
-    [ -z "$varValue" ] &&
+    [ -n "$varValue" ] ||
       errMsg+="ERROR: \$$varName was not set.\n"
     shift
   done
-  [ -n "$errMsg" ] && {
+  [ -z "$errMsg" ] || {
     printInfo "$errMsg"
     caller
     exit 1
@@ -129,26 +129,18 @@ showMenu(){ # $1: msg, $2: opt1, $3: opt2, ...; returns menu option in $input
 #  echo "${FUNCNAME[1]}: $input" # don't use echo to return results, otherwise you will not be able to show menu
 }
 
-toInt(){
-  sed 's/\..*//g'
-}
-
-twoDigits(){
-  local str
-  read str
-  if [ "$(echo "$str" | wc -m)" -eq 2 ]; then
-    echo "0$str"
-    return
-  fi
-  echo "$str"
+numDigits(){ # $1: digits
+  local num
+  read num
+  printf "%0$1i\n" $num
 }
 
 calcRunTime(){ # $1: start, $2: end
-  local   d="$(echo "(${2} - ${1}) / (24 * 60 * 60)" | bc | toInt )"
-  local   h="$(echo "(${2} - ${1}) / (60 * 60) % 24" | bc | toInt | twoDigits)"
-  local min="$(echo "(${2} - ${1}) / 60 % 60"        | bc | toInt | twoDigits)"
-  local   s="$(echo "(${2} - ${1}) % 60"             | bc | toInt | twoDigits)"
-  local  ms="$(echo "(${2} - ${1}) % 1 * 1000"       | bc | toInt )"
+  local   d="$(bc <<< "(${2} - ${1}) / (24 * 60 * 60)")"
+  local   h="$(bc <<< "(${2} - ${1}) / (60 * 60) % 24" | numDigits 2)"
+  local min="$(bc <<< "(${2} - ${1}) / 60 % 60"        | numDigits 2)"
+  local   s="$(bc <<< "(${2} - ${1}) % 60 / 1"         | numDigits 2)" # / 1 -> to int, because (scale=0)
+  local  ms="$(bc <<< "(${2} - ${1}) % 1 * 1000 / 1"   | numDigits 3)"
   echo "${d}d $h:$min:$s.$ms"
 }
 
