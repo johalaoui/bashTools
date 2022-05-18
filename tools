@@ -42,7 +42,7 @@ exit."
   }
 }
 
-packageDependency bc
+packageDependency bc rsync
 
 export TOOLS_SRC=true # Testing complete, tools sourced
 
@@ -189,4 +189,45 @@ chAddConf(){
       sudo tee -a "$confFile" <<< "$conf$sep$val" > /dev/null
     }
   }
+}
+
+rsyncMenu(){ # $1: rsyncOpts, $2: pathName1, $3: path1, $4: pathName2, $5: path2, $6: pre[=""], $7: dry-run[=true]
+  # Usage example:
+  #  rsyncMenu "-uav --del" \
+  #    "Server" "server:/home/user1/somedir/" \
+  #    "Local" "/home/user0/somedir/"
+  local rsyncOpts="$1"
+  
+  local pathName1="$2"
+  local path1="$3"
+  
+  local pathName2="$4"
+  local path2="$5"
+  
+  local pre="$6"
+  
+  local dryRun="$(getFlag "$7" "true")"
+  
+  local src dst
+  showMenu "Where do you want to copy the files to?" \
+    "$pathName1" \
+    "$pathName2"
+  res="$input" # leave result global
+  if [ "$res" == "$pathName1" ]; then
+    src="$path2"
+    dst="$path1"
+  else
+    src="$path1"
+    dst="$path2"
+  fi
+  
+  if $dryRun; then
+    $pre rsync $rsyncOpts --dry-run "$src" "$dst" | grep -E "deleting|" --color=always
+  fi
+  if question "Do you want to continue?
+(cp to $input: $src -> $dst)"; then
+    $pre rsync $rsyncOpts "$src" "$dst"
+  else
+    exit
+  fi
 }
