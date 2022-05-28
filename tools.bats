@@ -73,7 +73,7 @@ EOF
 )
 }
 
-@test "chAddConf 5: insert config without changing first one at the end" {
+@test "chAddConf 5: insert config at the end without changing first one" {
   setupChAddConfig
   chAddConf "$testDir/chAddConfigTestF" "var1=512"
   diff "$testDir/chAddConfigTestF" <(cat << EOF
