@@ -90,16 +90,18 @@ question(){ # $1: msg, $2: ansPreDef=false
     anstxt="[Y/n]"
   fi
   local ans=""
-  while ! grep -Ei '^[yn]$' <<< "$ans" &> /dev/null; do
+  while
     printInfo "$1 $anstxt"
     read ans
-    
-    $(getFlag "$ans" "$ansPreDef") && {
-      return 0
-    } || {
-      return 1
-    }
+    ! grep -Ei '^[yn]$|^$' <<< "$ans" &> /dev/null; do
+    true
   done
+
+  $(getFlag "$ans" "$ansPreDef") && {
+    return 0
+  } || {
+    return 1
+  }
 }
 
 showMenuRetNum(){ # $1: msg, $2: opt1, $3: opt2, ...; returns menu number in $input
