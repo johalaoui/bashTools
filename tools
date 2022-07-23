@@ -1,7 +1,7 @@
 #!/bin/bash
 ## Example for thisDir
 #thisDir="$(cd "$(dirname "$0")"; pwd)"
-#. "$thisDir/tools" # import tools
+#source "$thisDir/tools" # import tools
 
 if [ ! -e "$thisDir" ]; then
   echo "Please set variable \$thisDir correctly!";
@@ -131,19 +131,13 @@ showMenu(){ # $1: msg, $2: opt1, $3: opt2, ...; returns menu option in $input
 #  echo "${FUNCNAME[1]}: $input" # don't use echo to return results, otherwise you will not be able to show menu
 }
 
-numDigits(){ # $1: digits
-  local num
-  read num
-  printf "%0$1i\n" $num
-}
-
 calcRunTime(){ # $1: start, $2: end
   local   d="$(bc <<< "(${2} - ${1}) / (24 * 60 * 60)")"
-  local   h="$(bc <<< "(${2} - ${1}) / (60 * 60) % 24" | numDigits 2)"
-  local min="$(bc <<< "(${2} - ${1}) / 60 % 60"        | numDigits 2)"
-  local   s="$(bc <<< "(${2} - ${1}) % 60 / 1"         | numDigits 2)" # / 1 -> to int, because (scale=0)
-  local  ms="$(bc <<< "(${2} - ${1}) % 1 * 1000 / 1"   | numDigits 3)"
-  echo "${d}d $h:$min:$s.$ms"
+  local   h="$(bc <<< "(${2} - ${1}) / (60 * 60) % 24")"
+  local min="$(bc <<< "(${2} - ${1}) / 60 % 60")"
+  local   s="$(bc <<< "(${2} - ${1}) % 60 / 1")" # / 1 -> to int, because (scale=0)
+  local  ms="$(bc <<< "(${2} - ${1}) % 1 * 1000 / 1")"
+  printf "${d}d %02i:%02i:%02i.%03i\n" "$h" "$min" "$s" "$ms"
 }
 
 printRunTime(){ # $1: start, $2: end  ## needed for log()
