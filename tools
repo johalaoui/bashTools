@@ -30,16 +30,16 @@ packageDependency(){
   esac
 
   for p in $pkgs; do
-    $cmd $p >& /dev/null || {
+    if ! $cmd $p >& /dev/null; then
       missingPkgs+="$p "
-    }
+    fi
   done
 
-  [ -z "$missingPkgs" ] || {
+  if ! [ -z "$missingPkgs" ]; then
     echo "Missing Packages: $missingPkgs
 exit."
     exit 1
-  }
+  fi
 }
 
 packageDependency bc rsync
@@ -66,15 +66,16 @@ varIsSetOrError(){ # $1: varName ... $n: varName
   while [ "$#" -gt 0 ]; do
     local varName="$1"
     local varValue="${!1}"
-    [ -n "$varValue" ] ||
+    if ! [ -n "$varValue" ]; then
       errMsg+="ERROR: \$$varName was not set.\n"
+    fi
     shift
   done
-  [ -z "$errMsg" ] || {
+  if ! [ -z "$errMsg" ]; then
     printInfo "$errMsg"
     caller
     exit 1
-  }
+  fi
 }
 
 getFlag(){ # $1: input, $2: default=(false|true)
@@ -97,11 +98,11 @@ question(){ # $1: msg, $2: ansPreDef=false
     true
   done
 
-  $(getFlag "$ans" "$ansPreDef") && {
+  if $(getFlag "$ans" "$ansPreDef"); then
     return 0
-  } || {
+  else
     return 1
-  }
+  fi
 }
 
 showMenuRetNum(){ # $1: msg, $2: opt1, $3: opt2, ...; returns menu number in $input
@@ -173,18 +174,18 @@ chAddConf(){
   local val="$3"
   local sep="${4:- }"
   
-  sudo grep -E "^[ ]*$conf$sep" "$confFile" > /dev/null && {
+  if sudo grep -E "^[ ]*$conf$sep" "$confFile" > /dev/null; then
     # config exists
     sudo sed -i "s/^[ ]*$conf$sep.*/$conf$sep$val/g" "$confFile"
-  } || {
-    sudo grep -E "^[# ]*$conf$sep" "$confFile" > /dev/null && {
+  else
+    if sudo grep -E "^[# ]*$conf$sep" "$confFile" > /dev/null; then
       # config commented
       sudo sed -i "s/^[# ]*$conf$sep.*/$conf$sep$val/g" "$confFile"
-    } || {
+    else
       # no config
       sudo tee -a "$confFile" <<< "$conf$sep$val" > /dev/null
-    }
-  }
+    fi
+  fi
 }
 
 rsyncMenu(){ # $1: rsyncOpts, $2: pathName1, $3: path1, $4: pathName2, $5: path2, $6: pre[=""], $7: dry-run[=true]
