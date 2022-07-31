@@ -35,7 +35,7 @@ packageDependency(){
     fi
   done
 
-  if ! [ -z "$missingPkgs" ]; then
+  if [ -n "$missingPkgs" ]; then
     echo "Missing Packages: $missingPkgs
 exit."
     exit 1
@@ -66,12 +66,12 @@ varIsSetOrError(){ # $1: varName ... $n: varName
   while [ "$#" -gt 0 ]; do
     local varName="$1"
     local varValue="${!1}"
-    if ! [ -n "$varValue" ]; then
+    if [ -z "$varValue" ]; then
       errMsg+="ERROR: \$$varName was not set.\n"
     fi
     shift
   done
-  if ! [ -z "$errMsg" ]; then
+  if [ -n "$errMsg" ]; then
     printInfo "$errMsg"
     caller
     exit 1
@@ -176,15 +176,16 @@ chAddConf(){
   
   if sudo grep -E "^[ ]*$conf$sep" "$confFile" > /dev/null; then
     # config exists
-    sudo sed -i "s/^[ ]*$conf$sep.*/$conf$sep$val/g" "$confFile"
+    sudo sed -i "s'^[ ]*$conf$sep.*'$conf$sep$val'g" "$confFile" # / are needed for paths therefore use '
+    
+  elif sudo grep -E "^[# ]*$conf$sep" "$confFile" > /dev/null; then
+    # config commented
+    sudo sed -i "s'^[# ]*$conf$sep.*'$conf$sep$val'g" "$confFile"
+    
   else
-    if sudo grep -E "^[# ]*$conf$sep" "$confFile" > /dev/null; then
-      # config commented
-      sudo sed -i "s/^[# ]*$conf$sep.*/$conf$sep$val/g" "$confFile"
-    else
-      # no config
-      sudo tee -a "$confFile" <<< "$conf$sep$val" > /dev/null
-    fi
+    # no config
+    sudo tee -a "$confFile" <<< "$conf$sep$val" > /dev/null
+    
   fi
 }
 
